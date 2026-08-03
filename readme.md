@@ -1,44 +1,43 @@
 # ids-steam
 
-- original data: <https://data.mendeley.com/datasets/jxy85cr3th/2>
+Steamユーザーレビューデータセットから日本語レビューを抽出・解析するスクリプト群。
 
-## 実行
+## 概要
 
-- 最初にデータのダウンロードと解凍を実行
+Mendeley DataのSteamデータセット（games.jsonおよびsteam_data.zip）を自動取得し、高精度な判定ロジックを用いて日本語レビューを抽出・集約します。
 
-    ```bash
-    uv run download_data.py
-    ```
+- 言語: Python 3
+- パッケージマネージャー: uv
+- データ出典: <https://data.mendeley.com/datasets/jxy85cr3th/2>
 
-- メイン処理の実行
-    データ配置が完了したら、解析処理を走らせる。
+## 構造
 
-    ```bash
-    uv run main.py
-    ```
+```text
+ids-steam
+├── data/
+│   ├── games.json                      - ゲームメタデータ（23,107件）
+│   ├── steam_data/                     - 解凍後の全レビューCSV
+│   └── japanese_steam_reviews.csv      - 抽出後の日本語レビューCSV
+├── data_processor.py                   - 日本語判定・CSV/JSON処理の共有モジュール
+├── download_data.py                    - データ自動取得・解凍スクリプト
+├── main.py                             - 日本語レビュー抽出のメイン実行処理
+└── readme.md
+```
 
-## files
+## 実行方法
 
-- download_data.py
+| コマンド | 実行内容 |
+| --- | --- |
+| `uv run download_data.py` | Mendeleyからデータのダウンロードおよび解凍を実行（初回のみ） |
+| `uv run main.py` | メイン処理を実行し、日本語レビューを抽出して保存 |
 
-    VPS上で環境構築した際、最初に1度だけ実行してデータを完全自動で揃えるためのスクリプト
+## データ構造
 
-- data_processor.py
+### 処理結果ファイル
 
-    他のフィルタリングスクリプト（v1-to-v2.pyなど）でもインポートして使い回せる共有モジュール
-
-- mai.py
-
-    モジュール化した関数を組み合わせ、日本語レビュー抽出を実行する主体スクリプト
-
-## data files
-
-|ファイル名|説明|行数|目立つ問題|
-|---|---|---|---|
-|games.json|-|-|-|
-|jp-reviews-v1.csv|originalから、ひらがなまたはカタカナを任意の文字を挟んで3つ以上含む行のみ残した (注1)|約31万|AAを含む (8, 11行目など), 複数言語で投稿しているスパム的なレビューがある (65行目など)|
-
-Mendeleyのデータセットを構成するgames.jsonとsteam_data.zipについて、含まれるデータ項目およびデータ構造の詳細は以下の通りです。
+| ファイル名 | 説明 |
+| --- | --- |
+| `data/japanese_steam_reviews.csv` | 高精度フィルター（※注1）により抽出された日本語レビューデータ |
 
 ### games.jsonのデータと構造
 
