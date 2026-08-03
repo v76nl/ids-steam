@@ -1,6 +1,8 @@
 import argparse
+import gc
+import logging
 import os
-import random
+import sys
 import pandas as pd
 import torch
 from tqdm import tqdm
@@ -24,101 +26,152 @@ EMOTION_LABELS_JP = {
 MAIN_EMOTIONS_JP = [EMOTION_LABELS_JP[e] for e in EKMAN_EMOTIONS]
 
 
+def setup_logger(log_file: str):
+    logger = logging.getLogger("EmotionAnalyzer")
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter("[%(asctime)s][%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+
+    # ログファイル出力
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    fh = logging.FileHandler(log_file, encoding="utf-8")
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+
+    # 標準出力
+    sh = logging.StreamHandler(sys.stdout)
+    sh.setFormatter(formatter)
+    logger.addHandler(sh)
+
+    return logger
+
+
 class EmotionAnalyzer:
-    def __init__(self, model_name: str = "neuralnaut/deberta-wrime-emotions"):
-        """
-        WRIMEデータセット等でファインチューニングされたモデルを初期化
-        """
-        print(f"感情分析モデル ({model_name}) を読み込んでいます……")
+    def __init__(self, model_name: str = "neuralnaut/deberta-wrime-emotions", logger=None):
+        self.logger = logger or logging.getLogger("EmotionAnalyzer")
+        self.logger.info(f"感情分析モデル ({model_name}) を初期化中……")
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForSequenceClassification.from_pretrained(model_name).to(self.device)
         self.model.eval()
 
         self.id2label = self.model.config.id2label
+        self.logger.info(f"モデル初期化完了 (使用デバイス: {self.device})")
 
-    def analyze_dataframe(self, df: pd.DataFrame, text_column: str = "review", batch_size: int = 32) -> pd.DataFrame:
-        """
-        データフレーム全体のレビューからバッチ処理で6つの感情スコア・割合(%)・ランキングを高速計算
-        """
-        df_result = df.copy()
-        total_items = len(df_result)
-        print(f"合計 {total_items} 件のレビューに対して感情分析を開始します (Device: {self.device}, Batch Size: {batch_size})……")
+    def process_batch(self, batch_texts: list) -> list:
+        inputs = self.tokenizer(
+            batch_texts,
+            return_tensors="pt",
+            truncation=True,
+            padding=True,
+            max_length=512
+        ).to(self.device)
 
-        texts = df_result[text_column].fillna("").astype(str).tolist()
-        emotion_records = []
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+            scores_batch = torch.sigmoid(outputs.logits).cpu().numpy()
 
-        # tqdmによる進捗率(%)付きリアルタイムプログレスバー
-        with tqdm(total=total_items, desc="感情分析進捗", unit="件") as pbar:
-            for i in range(0, total_items, batch_size):
-                batch_texts = texts[i : i + batch_size]
+        results = []
+        for scores in scores_batch:
+            record = {}
+            for idx, score in enumerate(scores):
+                raw_label = self.id2label.get(idx, f"label_{idx}").lower()
+                jp_label = EMOTION_LABELS_JP.get(raw_label, raw_label)
+                record[jp_label] = float(score)
+            results.append(record)
+        return results
 
-                inputs = self.tokenizer(
-                    batch_texts,
-                    return_tensors="pt",
-                    truncation=True,
-                    padding=True,
-                    max_length=512
-                ).to(self.device)
+    def analyze_dataframe_incremental(
+        self,
+        df: pd.DataFrame,
+        output_csv: str,
+        text_column: str = "review",
+        batch_size: int = 32,
+        save_interval: int = 1000,
+        start_index: int = 0
+    ):
+        total_items = len(df)
+        self.logger.info(f"処理対象件数: {total_items} 件 (開始位置: {start_index} 件目から)")
 
-                with torch.no_grad():
-                    outputs = self.model(**inputs)
-                    logits = outputs.logits
-                    scores_batch = torch.sigmoid(logits).cpu().numpy()
+        is_first_write = (start_index == 0) or (not os.path.exists(output_csv))
+        texts = df[text_column].fillna("").astype(str).tolist()
 
-                for scores in scores_batch:
-                    record = {}
-                    for idx, score in enumerate(scores):
-                        raw_label = self.id2label.get(idx, f"label_{idx}").lower()
-                        jp_label = EMOTION_LABELS_JP.get(raw_label, raw_label)
-                        record[jp_label] = float(score)
-                    emotion_records.append(record)
+        buffer_rows = []
+
+        with tqdm(total=total_items, initial=start_index, desc="感情分析進捗", unit="件") as pbar:
+            for i in range(start_index, total_items, batch_size):
+                batch_end = min(i + batch_size, total_items)
+                batch_texts = texts[i:batch_end]
+                batch_df = df.iloc[i:batch_end].copy()
+
+                try:
+                    scores_records = self.process_batch(batch_texts)
+                    scores_df = pd.DataFrame(scores_records)
+
+                    for emotion in MAIN_EMOTIONS_JP:
+                        if emotion in scores_df.columns:
+                            batch_df[f"score_{emotion}"] = scores_df[emotion].values.round(4)
+                        else:
+                            batch_df[f"score_{emotion}"] = 0.0
+
+                    six_scores = batch_df[[f"score_{e}" for e in MAIN_EMOTIONS_JP]]
+                    row_sums = six_scores.sum(axis=1).replace(0, 1.0)
+
+                    for emotion in MAIN_EMOTIONS_JP:
+                        batch_df[f"ratio_{emotion}_pct"] = ((batch_df[f"score_{emotion}"] / row_sums) * 100).round(1)
+
+                    batch_df["primary_emotion"] = six_scores.idxmax(axis=1).str.replace("score_", "")
+
+                    def get_top_ranking(row):
+                        ranked = row.sort_values(ascending=False)
+                        return " > ".join([f"{idx.replace('score_', '')}({val:.2f})" for idx, val in ranked.iloc[:3].items()])
+
+                    batch_df["emotion_ranking"] = six_scores.apply(get_top_ranking, axis=1)
+
+                    buffer_rows.append(batch_df)
+
+                except Exception as e:
+                    self.logger.error(f"バッチ [{i}:{batch_end}] 処理中にエラーが発生しました: {e}. スキップして続行します。")
 
                 pbar.update(len(batch_texts))
 
-        scores_df = pd.DataFrame(emotion_records)
-
-        # 6つの主要感情の絶対スコアを記録
-        for emotion in MAIN_EMOTIONS_JP:
-            if emotion in scores_df.columns:
-                df_result[f"score_{emotion}"] = scores_df[emotion].round(4)
-
-        # 各行における6感情の相対割合(%)を算出
-        six_scores = df_result[[f"score_{e}" for e in MAIN_EMOTIONS_JP]]
-        row_sums = six_scores.sum(axis=1).replace(0, 1.0)
-
-        for emotion in MAIN_EMOTIONS_JP:
-            df_result[f"ratio_{emotion}_pct"] = ((df_result[f"score_{emotion}"] / row_sums) * 100).round(1)
-
-        # 1位の主要感情および上位3つのランキング表現を追加
-        df_result["primary_emotion"] = six_scores.idxmax(axis=1).str.replace("score_", "")
-
-        def get_top_ranking(row):
-            ranked = row.sort_values(ascending=False)
-            return " > ".join([f"{idx.replace('score_', '')}({val:.2f})" for idx, val in ranked.iloc[:3].items()])
-
-        df_result["emotion_ranking"] = six_scores.apply(get_top_ranking, axis=1)
-
-        return df_result
+                # 一定件数ごとにディスク追記保存 & メモリ解放 (OOM防止)
+                if len(buffer_rows) * batch_size >= save_interval or batch_end == total_items:
+                    if buffer_rows:
+                        chunk_df = pd.concat(buffer_rows, ignore_index=True)
+                        chunk_df.to_csv(
+                            output_csv,
+                            mode="a" if not is_first_write else "w",
+                            index=False,
+                            header=is_first_write,
+                            encoding="utf-8-sig"
+                        )
+                        is_first_write = False
+                        buffer_rows.clear()
+                        gc.collect()
+                        self.logger.info(f"チェックポイント保存: {batch_end}/{total_items} 件完了 -> '{output_csv}'")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Steam日本語レビュー 6感情分析スクリプト")
+    parser = argparse.ArgumentParser(description="Steam日本語レビュー 6感情分析スクリプト (VPS長時間バッチ対応版)")
     parser.add_argument("sample_size", type=int, nargs="?", default=None, help="分析件数 (未指定の場合は全件分析)")
     parser.add_argument("--batch-size", type=int, default=32, help="推論バッチサイズ (デフォルト: 32)")
+    parser.add_argument("--save-interval", type=int, default=1000, help="中間追記保存の件数インターバル (デフォルト: 1000)")
+    parser.add_argument("--no-resume", action="store_true", help="途中再開を行わず最初から上書き実行")
     args = parser.parse_args()
 
     input_csv = "data/japanese_steam_reviews.csv"
+    log_file = "data/analyze_emotions.log"
+    logger = setup_logger(log_file)
 
     if not os.path.exists(input_csv):
-        print(f"エラー: 入力ファイル '{input_csv}' が存在しません。先に main.py を実行してください。")
+        logger.error(f"入力ファイル '{input_csv}' が存在しません。先に main.py を実行してください。")
         return
 
-    print(f"'{input_csv}' からデータを読み込んでいます……")
+    logger.info(f"入力データ '{input_csv}' を読み込んでいます……")
     df_raw = pd.read_csv(input_csv)
 
     if df_raw.empty or "review" not in df_raw.columns:
-        print("エラー: レビューデータが空であるか、'review' 列が存在しません。")
+        logger.error("エラー: レビューデータが空であるか、'review' 列が存在しません。")
         return
 
     total_count = len(df_raw)
@@ -127,43 +180,38 @@ def main():
         actual_sample_size = min(args.sample_size, total_count)
         df_target = df_raw.sample(n=actual_sample_size, random_state=42).reset_index(drop=True)
         output_csv = "data/japanese_steam_reviews_emotion_sample.csv"
-        print(f"全 {total_count} 件中、指定された {actual_sample_size} 件をランダム抽出して分析します。")
+        logger.info(f"全 {total_count} 件中、指定された {actual_sample_size} 件をサンプリング分析します。")
     else:
         df_target = df_raw.reset_index(drop=True)
         actual_sample_size = total_count
         output_csv = "data/japanese_steam_reviews_emotions.csv"
-        print(f"全件分析を開始します (合計 {total_count} 件)。")
+        logger.info(f"全件分析処理を開始します (合計 {total_count} 件)。")
 
-    analyzer = EmotionAnalyzer()
-    df_analyzed = analyzer.analyze_dataframe(df_target, text_column="review", batch_size=args.batch_size)
+    # チェックポイント（途中再開）機能
+    start_index = 0
+    if not args.no_resume and os.path.exists(output_csv):
+        try:
+            existing_df = pd.read_csv(output_csv)
+            start_index = len(existing_df)
+            if start_index >= actual_sample_size:
+                logger.info(f"すでに全処理 ({start_index}/{actual_sample_size} 件) が完了しています。'{output_csv}' をご確認ください。")
+                return
+            logger.info(f"既存の出力ファイル '{output_csv}' を検出しました。{start_index} 件目から処理を自動再開します。")
+        except Exception as err:
+            logger.warning(f"既存出力ファイルの読み込みに失敗したため、最初から実行します: {err}")
+            start_index = 0
 
-    # 結果をCSV保存
-    os.makedirs(os.path.dirname(output_csv), exist_ok=True)
-    df_analyzed.to_csv(output_csv, index=False, encoding="utf-8-sig")
-    print(f"\n分析結果をCSVとして保存しました: {output_csv}")
+    analyzer = EmotionAnalyzer(logger=logger)
+    analyzer.analyze_dataframe_incremental(
+        df_target,
+        output_csv=output_csv,
+        text_column="review",
+        batch_size=args.batch_size,
+        save_interval=args.save_interval,
+        start_index=start_index
+    )
 
-    # シェルへの簡略サマリー表示
-    display_limit = min(5 if actual_sample_size > 10 else actual_sample_size, actual_sample_size)
-    print("\n" + "=" * 80)
-    print(f"【感情分析結果サマリー (全{actual_sample_size}件中 上位{display_limit}件を表示)】")
-    print("=" * 80)
-
-    for idx in range(display_limit):
-        row = df_analyzed.iloc[idx]
-        game_title = row.get("game_title", row.get("appid", "Unknown Game"))
-        review_text = str(row["review"]).replace("\n", " ")
-        short_text = (review_text[:60] + "...") if len(review_text) > 60 else review_text
-
-        print(f"\n[{idx + 1}/{display_limit}] ゲーム: {game_title}")
-        print(f"  レビュー: \"{short_text}\"")
-        print(f"  主要感情: 【{row['primary_emotion']}】")
-        print(f"  感情ランキング: {row['emotion_ranking']}")
-
-        ratios = [f"{e}:{row[f'ratio_{e}_pct']}%" for e in MAIN_EMOTIONS_JP]
-        print(f"  感情割合(%): " + " | ".join(ratios))
-
-    print("\n" + "=" * 80)
-    print(f"詳細なCSVデータ出力先: '{output_csv}'")
+    logger.info(f"すべての処理が完了しました。出力ファイル: '{output_csv}'")
 
 
 if __name__ == "__main__":

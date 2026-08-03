@@ -1,3 +1,4 @@
 data/
 steam_data.zip
 .agent/
+__pycache__/
