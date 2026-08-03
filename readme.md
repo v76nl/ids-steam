@@ -93,5 +93,5 @@ tail -f data/analyze_emotions.log
 | アーキテクチャ     | x86_64                                          |
 | GPU                | 物理GPU無し、QEMU Standard VGA 仮想グラフィック |
 | RAM                | 16GiB                                           |
-| ROM                | 1TiB                                            |
+| ROM                | 800GB                                           |
 | 仮想化環境         | QEMU KVM                                        |
