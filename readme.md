@@ -18,8 +18,9 @@ ids-steam
 │   ├── games.json                      - ゲームメタデータ（23,107件）
 │   ├── steam_data/                     - 解凍後の全レビューCSV
 │   ├── japanese_steam_reviews.csv      - 抽出後の日本語レビューCSV
-│   └── japanese_steam_reviews_emotion_sample.csv - 感情分析結果CSV
-├── analyze_emotions.py                 - 実際のデータから10件抽出して6感情分析・割合/ランキング算出
+│   ├── japanese_steam_reviews_emotions.csv - 全件感情分析結果CSV
+│   └── japanese_steam_reviews_emotion_sample.csv - サンプル感情分析結果CSV
+├── analyze_emotions.py                 - 6感情分析モジュール（全件/件数指定対応・tqdm進捗表示）
 ├── data_processor.py                   - 日本語判定・CSV/JSON処理の共有モジュール
 ├── download_data.py                    - データ自動取得・解凍スクリプト
 ├── main.py                             - 日本語レビュー抽出のメイン実行処理
@@ -32,7 +33,8 @@ ids-steam
 | --- | --- |
 | `uv run download_data.py` | Mendeleyからデータのダウンロードおよび解凍を実行（初回のみ） |
 | `uv run main.py` | メイン処理を実行し、日本語レビューを抽出して保存 |
-| `uv run analyze_emotions.py` | `japanese_steam_reviews.csv` からランダム10件抽出し、6感情スコア・割合・ランキングを出力 |
+| `uv run analyze_emotions.py` | `japanese_steam_reviews.csv` の全件に対して6感情分析を実行（プログレスバー表示） |
+| `uv run analyze_emotions.py 100` | 指定件数（例: 100件）をランダム抽出し感情分析を実行 |
 
 ## データ構造
 
@@ -41,49 +43,25 @@ ids-steam
 | ファイル名 | 説明 |
 | --- | --- |
 | `data/japanese_steam_reviews.csv` | 高精度フィルター（※注1）により抽出された日本語レビューデータ |
-| `data/japanese_steam_reviews_emotion_sample.csv` | 6感情のスコア・感情割合(%)・ランキング（上位3感情）を追加した結果ファイル |
+| `data/japanese_steam_reviews_emotions.csv` | 全件感情分析結果（6感情スコア・割合(%)・ランキング） |
+| `data/japanese_steam_reviews_emotion_sample.csv` | 件数指定時の感情分析結果（6感情スコア・割合(%)・ランキング） |
 
 ### games.jsonのデータと構造
 
-#### 概要と全体構造
+2020年1月から2024年12月までにSteamでリリースされた23,107タイトルのメタデータ。AppIDをキーとするJSON構造。
 
-games.jsonは、2020年1月から2024年12月までにSteamでリリースされた23,107タイトルのメタデータを格納したJSON形式のファイルです。アプリケーション固有の識別子であるAppIDをキーとして、各ゲームの属性情報が構造化されています。
-
-#### 含まれる主要なデータ項目
-
-ゲームのメタデータは、主に基本情報とシステム情報の2つの側面に分類されて格納されています。
-
-- **ゲームの基本情報と価格情報**
-- アプリIDおよびゲームの正式タイトル
-- リリース日
-- 通常価格や割引に関する情報
-
-- **ゲームの属性とシステム情報**
-- アクションやシミュレーションなどのジャンル分類
-- マルチプレイヤーやシングルプレイヤーなどのカテゴリ分類
-- 対応言語や音声サポートの有無
-- 年齢制限のレーティング
-
----
+- **基本情報**: AppID, タイトル, リリース日, 価格情報
+- **属性情報**: ジャンル, カテゴリ, 対応言語, 年齢制限
 
 ### steam_data.zipのデータと構造
 
-#### 概要と全体構造
+3,100万件以上のユーザーレビュー（レビュー数25件未満のタイトルは除外）。解凍後は `AppID_レビュー数.csv` の形式で個別格納。
 
-steam_data.zipは、games.jsonに記録されているゲームに対応する3,100万件以上のユーザーレビューを格納した圧縮ファイルです。統計的な偏りを避けるため、レビュー総数が25件未満のゲームは収集対象から除外されています。
-
-解凍すると、Game Reviewsというフォルダの中に、ゲームごとの個別CSVファイルが大量に格納されています。各CSVファイルの名称は、アプリIDとレビュー件数をアンダースコアで組み合わせた形式
-
-#### CSVファイル内に含まれる主要なデータ項目
-
-user, playtime, post_date, helpfulness, review, recommend, early_access_review, appid, game_title, genres, source_file
+- **CSVデータ項目**: `user`, `playtime`, `post_date`, `helpfulness`, `review`, `recommend`, `early_access_review`, `appid`, `game_title`, `genres`, `source_file`
 
 ---
 
-ゲームの性質を表すメタデータと、ユーザーの反応を表すレビューデータが、アプリIDを媒介にして結びつけられるリレーショナル構造になっています。
-
-- 注1
-
-    ```python
-    [\u3040-\u309F\u30A0-\u30FF].*[\u3040-\u309F\u30A0-\u30FF].*[\u3040-\u309F\u30A0-\u30FF]
-    ```
+- 注1：日本語判定フィルター（`data_processor.py`）
+  - 連続したひらがな2文字以上を含む
+  - かな（ひらがな・カタカナ）の総文字数が10文字以上
+  - レビュー全体における「かな密度」が 5% 以上
