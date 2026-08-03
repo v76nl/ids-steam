@@ -50,6 +50,13 @@ class EmotionAnalyzer:
         self.logger = logger or logging.getLogger("EmotionAnalyzer")
         self.logger.info(f"感情分析モデル ({model_name}) を初期化中……")
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # CPUマルチスレッド最適化 (Intel Xeon Sapphire Rapids 8コア対応)
+        if self.device == "cpu":
+            num_cores = os.cpu_count() or 8
+            torch.set_num_threads(num_cores)
+            self.logger.info(f"PyTorch CPU並列処理スレッド数を {num_cores} に設定しました (Intel AMX / AVX-512 最適化)")
+
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForSequenceClassification.from_pretrained(model_name).to(self.device)
         self.model.eval()
@@ -85,7 +92,7 @@ class EmotionAnalyzer:
         df: pd.DataFrame,
         output_csv: str,
         text_column: str = "review",
-        batch_size: int = 32,
+        batch_size: int = 64,
         save_interval: int = 1000,
         start_index: int = 0
     ):
@@ -154,8 +161,8 @@ class EmotionAnalyzer:
 def main():
     parser = argparse.ArgumentParser(description="Steam日本語レビュー 6感情分析スクリプト (VPS長時間バッチ対応版)")
     parser.add_argument("sample_size", type=int, nargs="?", default=None, help="分析件数 (未指定の場合は全件分析)")
-    parser.add_argument("--batch-size", type=int, default=32, help="推論バッチサイズ (デフォルト: 32)")
-    parser.add_argument("--save-interval", type=int, default=1000, help="中間追記保存の件数インターバル (デフォルト: 1000)")
+    parser.add_argument("--batch-size", type=int, default=64, help="推論バッチサイズ (デフォルト: 64)")
+    parser.add_argument("--save-interval", type=int, default=100, help="中間追記保存の件数インターバル (デフォルト: 100)")
     parser.add_argument("--no-resume", action="store_true", help="途中再開を行わず最初から上書き実行")
     args = parser.parse_args()
 

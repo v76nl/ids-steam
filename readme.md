@@ -30,14 +30,14 @@ ids-steam
 
 ## 実行方法
 
-| コマンド | 実行内容 |
-| --- | --- |
-| `uv run download_data.py` | Mendeleyからデータのダウンロードおよび解凍を実行（初回のみ） |
-| `uv run main.py` | メイン処理を実行し、日本語レビューを抽出して保存 |
-| `uv run analyze_emotions.py` | `japanese_steam_reviews.csv` の全件に対して6感情分析を実行（途中再開レジューム対応） |
-| `uv run analyze_emotions.py 100` | 指定件数（例: 100件）をランダム抽出し感情分析を実行 |
-| `nohup uv run analyze_emotions.py > data/analyze_emotions.log 2>&1 &` | VPS環境等でSSH切断に強いバックグラウンド全件実行 |
-| `tail -f data/analyze_emotions.log` | バックグラウンド実行中の進捗ログをリアルタイム確認 |
+| コマンド                                                              | 実行内容                                                                             |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `uv run download_data.py`                                             | Mendeleyからデータのダウンロードおよび解凍を実行（初回のみ）                         |
+| `uv run main.py`                                                      | メイン処理を実行し、日本語レビューを抽出して保存                                     |
+| `uv run analyze_emotions.py`                                          | `japanese_steam_reviews.csv` の全件に対して6感情分析を実行（途中再開レジューム対応） |
+| `uv run analyze_emotions.py 100`                                      | 指定件数（例: 100件）をランダム抽出し感情分析を実行                                  |
+| `nohup uv run analyze_emotions.py > data/analyze_emotions.log 2>&1 &` | VPS環境等でSSH切断に強いバックグラウンド全件実行                                     |
+| `tail -f data/analyze_emotions.log`                                   | バックグラウンド実行中の進捗ログをリアルタイム確認                                   |
 
 ### VPSでの長時間バックグラウンド実行（SSH切断・OOM対策）
 
@@ -57,10 +57,10 @@ tail -f data/analyze_emotions.log
 
 ### 処理結果ファイル
 
-| ファイル名 | 説明 |
-| --- | --- |
-| `data/japanese_steam_reviews.csv` | 高精度フィルター（※注1）により抽出された日本語レビューデータ |
-| `data/japanese_steam_reviews_emotions.csv` | 全件感情分析結果（6感情スコア・割合(%)・ランキング） |
+| ファイル名                                       | 説明                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------ |
+| `data/japanese_steam_reviews.csv`                | 高精度フィルター（※注1）により抽出された日本語レビューデータ |
+| `data/japanese_steam_reviews_emotions.csv`       | 全件感情分析結果（6感情スコア・割合(%)・ランキング）         |
 | `data/japanese_steam_reviews_emotion_sample.csv` | 件数指定時の感情分析結果（6感情スコア・割合(%)・ランキング） |
 
 ### games.jsonのデータと構造
@@ -82,3 +82,16 @@ tail -f data/analyze_emotions.log
   - 連続したひらがな2文字以上を含む
   - かな（ひらがな・カタカナ）の総文字数が10文字以上
   - レビュー全体における「かな密度」が 5% 以上
+
+## ゼミVPSのスペック
+
+| 構成要素           | 詳細スペック                                    |
+| ------------------ | ----------------------------------------------- |
+| CPU                | Intel Xeon Processor Sapphire Rapids            |
+| コア数とスレッド数 | 8コア 8スレッド、独立した8ソケット構成          |
+| CPU拡張機能        | Intel AMX 対応                                  |
+| アーキテクチャ     | x86_64                                          |
+| GPU                | 物理GPU無し、QEMU Standard VGA 仮想グラフィック |
+| RAM                | 16GiB                                           |
+| ROM                | 1TiB                                            |
+| 仮想化環境         | QEMU KVM                                        |
