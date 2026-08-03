@@ -4,7 +4,7 @@ Steamユーザーレビューデータセットから日本語レビューを抽
 
 ## 概要
 
-Mendeley DataのSteamデータセット（games.jsonおよびsteam_data.zip）を自動取得し、高精度な判定ロジックを用いて日本語レビューを抽出・集約します。
+Mendeley DataのSteamデータセット（games.jsonおよびsteam_data.zip）を自動取得し、高精度な判定ロジックを用いて日本語レビューを抽出・集約します。また、Hugging Faceの感情分析モデルを用いて6つの基本感情軸（喜び・怒り・嫌悪・悲しみ・恐怖・驚き）での感情分析を実施可能です。
 
 - 言語: Python 3
 - パッケージマネージャー: uv
@@ -17,7 +17,9 @@ ids-steam
 ├── data/
 │   ├── games.json                      - ゲームメタデータ（23,107件）
 │   ├── steam_data/                     - 解凍後の全レビューCSV
-│   └── japanese_steam_reviews.csv      - 抽出後の日本語レビューCSV
+│   ├── japanese_steam_reviews.csv      - 抽出後の日本語レビューCSV
+│   └── japanese_steam_reviews_emotion_sample.csv - 感情分析結果CSV
+├── analyze_emotions.py                 - 実際のデータから10件抽出して6感情分析・割合/ランキング算出
 ├── data_processor.py                   - 日本語判定・CSV/JSON処理の共有モジュール
 ├── download_data.py                    - データ自動取得・解凍スクリプト
 ├── main.py                             - 日本語レビュー抽出のメイン実行処理
@@ -30,6 +32,7 @@ ids-steam
 | --- | --- |
 | `uv run download_data.py` | Mendeleyからデータのダウンロードおよび解凍を実行（初回のみ） |
 | `uv run main.py` | メイン処理を実行し、日本語レビューを抽出して保存 |
+| `uv run analyze_emotions.py` | `japanese_steam_reviews.csv` からランダム10件抽出し、6感情スコア・割合・ランキングを出力 |
 
 ## データ構造
 
@@ -38,6 +41,7 @@ ids-steam
 | ファイル名 | 説明 |
 | --- | --- |
 | `data/japanese_steam_reviews.csv` | 高精度フィルター（※注1）により抽出された日本語レビューデータ |
+| `data/japanese_steam_reviews_emotion_sample.csv` | 6感情のスコア・感情割合(%)・ランキング（上位3感情）を追加した結果ファイル |
 
 ### games.jsonのデータと構造
 
