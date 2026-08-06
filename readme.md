@@ -18,25 +18,29 @@ ids-steam
 │   ├── games.json                      - ゲームメタデータ（23,107件）
 │   ├── steam_data/                     - 解凍後の全レビューCSV
 │   ├── japanese_steam_reviews.csv      - 抽出後の日本語レビューCSV
-│   ├── japanese_steam_reviews_emotions.csv - 全件感情分析結果CSV
+│   ├── japanese_steam_reviews_emotions.csv - 全件感情分析結果CSV（25.8万件）
 │   ├── japanese_steam_reviews_emotion_sample.csv - サンプル感情分析結果CSV
-│   └── analyze_emotions.log            - 感情分析の進捗・エラーログ
+│   ├── analyze_emotions.log            - 感情分析の進捗・エラーログ
+│   └── insights/                       - Recommended比較・プレイ時間別感情分析集計CSV
 ├── 01_download_data.py                 - Step 1: データ自動取得・解凍スクリプト
 ├── 02_extract_japanese_reviews.py      - Step 2: 日本語レビュー抽出・集約処理
 ├── 03_analyze_emotions.py              - Step 3: 6感情分析処理（OOM防止追記保存・途中再開レジューム・nohup対応）
+├── 04_analyze_review_correlations.py   - Step 4: Recommended/Not Recommended比較・プレイ時間別感情相関の集計
 ├── data_processor.py                   - 日本語判定・CSV/JSON処理の共有モジュール
+├── analysis_report.md                  - 分析結果の考察・知見レポートメモ
 └── readme.md
 ```
 
 ## 実行方法
 
-番号順（`01_` → `02_` → `03_`）に従ってスクリプトを実行します。
+番号順（`01_` → `02_` → `03_` → `04_`）に従ってスクリプトを実行します。
 
 | ステップ | コマンド | 実行内容 |
 | --- | --- | --- |
 | **Step 1** | `uv run 01_download_data.py` | Mendeleyからデータのダウンロードおよび解凍を実行（初回のみ） |
 | **Step 2** | `uv run 02_extract_japanese_reviews.py` | 全レビューCSVから日本語レビューを抽出して `japanese_steam_reviews.csv` へ保存 |
 | **Step 3** | `uv run 03_analyze_emotions.py` | `japanese_steam_reviews.csv` の全件に対して6感情分析を実行 |
+| **Step 4** | `uv run 04_analyze_review_correlations.py` | Recommended / Not Recommended の感情比較およびプレイ時間別感情相関の定量分析 |
 | (テスト) | `uv run 03_analyze_emotions.py 100` | 指定件数（例: 100件）をランダム抽出して6感情分析を実行 |
 
 ### VPSでの長時間バックグラウンド実行（SSH切断・OOM対策）
@@ -53,15 +57,16 @@ tail -f data/analyze_emotions.log
 
 万が一プロセスの途中で切断や再起動が発生しても、次回実行時に自動で**未処理の件数から途中再開**されます。
 
-## データ構造
+## データ構造・レポート
 
-### 処理結果ファイル
+### 処理結果ファイル・分析レポート
 
 | ファイル名 | 説明 |
 | --- | --- |
+| [analysis_report.md](analysis_report.md) | 分析レポートメモ: Not Recommended の要因分析やプレイ時間との相関知見をまとめたレポート |
 | `data/japanese_steam_reviews.csv` | 高精度フィルター（※注1）により抽出された日本語レビューデータ |
 | `data/japanese_steam_reviews_emotions.csv` | 全件感情分析結果（6感情スコア・割合(%)・ランキング） |
-| `data/japanese_steam_reviews_emotion_sample.csv` | 件数指定時の感情分析結果（6感情スコア・割合(%)・ランキング） |
+| `data/insights/` | Recommended 比較およびプレイ時間帯別感情相関の集計結果ディレクトリ |
 
 ### games.jsonのデータと構造
 
@@ -81,7 +86,7 @@ tail -f data/analyze_emotions.log
 - 注1：日本語判定フィルター（`data_processor.py`）
   - 連続したひらがな2文字以上を含む
   - かな（ひらがな・カタカナ）の総文字数が10文字以上
-  - レビュー全体における「かな密度」が 5% 以上
+  - レビュー全体における「かな密度」が 5% 以上の行を残す
 
 ## ゼミVPSのスペック
 
