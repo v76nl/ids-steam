@@ -28,25 +28,27 @@ ids-steam
 ├── 02_extract_japanese_reviews.py      - Step 2: 日本語レビュー抽出・集約処理
 ├── 03_analyze_emotions.py              - Step 3: 6感情分析処理（OOM防止追記保存・途中再開レジューム・nohup対応）
 ├── 04_analyze_review_correlations.py   - Step 4: Recommended/Not Recommended比較・プレイ時間別感情相関の集計
-├── 05_analyze_genre_emotions.py        - Step 5: ゲームジャンル（genres）別の感情プロファイル集計
-├── 06_analyze_genre_playtime_correlations.py - Step 6: ジャンル別のプレイ時間vs感情相関集計
-├── data_processor.py                   - 日本語判定・CSV/JSON処理の共有モジュール
-├── analysis_report.md                  - 分析結果の考察・知見レポートメモ
+├── 05_analyze_genre_emotions.py        - Step 3-2: ジャンル別の感情抽出
+├── 06_analyze_genre_playtime_correlations.py - Step 4-2: ジャンル別の相関分析
+├── 07_analyze_frequent_words.py        - Step 5: 頻出語（複合名詞）の抽出
+├── data_processor.py                   - 共通データ処理・ファイルI/O用モジュール
+├── analysis_report.md                  - 各種分析結果・知見をまとめたレポート
 └── readme.md
 ```
 
 ## 実行方法
 
-番号順（`01_` → `02_` → `03_` → `04_` → `05_` → `06_`）に従ってスクリプトを実行します。
+各スクリプトを順番に実行することで、データの取得から分析までを一貫して行うことができます。
 
 | ステップ   | コマンド                                           | 実行内容                                                                      |
 | ---------- | -------------------------------------------------- | ----------------------------------------------------------------------------- |
 | **Step 1** | `uv run 01_download_data.py`                       | Mendeleyからデータのダウンロードおよび解凍を実行（初回のみ）                  |
 | **Step 2** | `uv run 02_extract_japanese_reviews.py`            | 全レビューCSVから日本語レビューを抽出して `japanese_steam_reviews.csv` へ保存 |
 | **Step 3** | `uv run 03_analyze_emotions.py`                    | `japanese_steam_reviews.csv` の全件に対して6感情分析を実行                    |
+| **Step 3-2**| `uv run 05_analyze_genre_emotions.py`              | ゲームジャンル別の感情プロファイルおよび評価構成の集計分析                    |
 | **Step 4** | `uv run 04_analyze_review_correlations.py`         | Recommended / Not Recommended の感情比較およびプレイ時間別感情相関の定量分析  |
-| **Step 5** | `uv run 05_analyze_genre_emotions.py`              | ゲームジャンル別の感情プロファイルおよび評価構成の集計分析                    |
-| **Step 6** | `uv run 06_analyze_genre_playtime_correlations.py` | 各ゲームジャンル内でのプレイ時間と感情割合の相関分析                          |
+| **Step 4-2**| `uv run 06_analyze_genre_playtime_correlations.py` | 各ゲームジャンル内でのプレイ時間と感情割合の相関分析                          |
+| **Step 5** | `uv run 07_analyze_frequent_words.py`              | 頻出語（複合名詞）の抽出                                                      |
 | (テスト)   | `uv run 03_analyze_emotions.py 100`                | 指定件数（例: 100件）をランダム抽出して6感情分析を実行                        |
 
 ### VPSでの長時間バックグラウンド実行（SSH切断・OOM対策）
