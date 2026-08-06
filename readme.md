@@ -51,6 +51,18 @@ ids-steam
 | **Step 5** | `uv run 07_analyze_frequent_words.py`              | 頻出語（複合名詞）の抽出                                                      |
 | (テスト)   | `uv run 03_analyze_emotions.py 100`                | 指定件数（例: 100件）をランダム抽出して6感情分析を実行                        |
 
+### コードの自動整形・静的解析 (Ruff)
+
+コードの品質保持および自動整形のコマンド：
+
+```bash
+# コードの不備チェックおよび自動修正
+uv run ruff check --fix .
+
+# コードの自動フォーマット
+uv run ruff format .
+```
+
 ### VPSでの長時間バックグラウンド実行（SSH切断・OOM対策）
 
 SSH接続が切れてもバックグラウンドで安全に完走させるため、`nohup` での実行を推奨します。
