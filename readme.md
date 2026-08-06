@@ -1,10 +1,12 @@
 # ids-steam
 
 Steamユーザーレビューデータセットから日本語レビューを抽出・解析するスクリプト群。
+iDS (AI・データサイエンス演習) ゼミでの研究。
 
 ## 概要
 
-Mendeley DataのSteamデータセット（games.jsonおよびsteam_data.zip）を自動取得し、高精度な判定ロジックを用いて日本語レビューを抽出・集約します。また、Hugging Faceの感情分析モデルを用いて6つの基本感情軸（喜び・怒り・嫌悪・悲しみ・恐怖・驚き）での感情分析を実施可能です。
+Mendeley DataのSteamデータセット（games.jsonおよびsteam_data.zip）を自動取得し、高精度な判定ロジックを用いて日本語レビューを抽出・集約します。
+また、Hugging Faceの感情分析モデルを用いて6つの基本感情軸（喜び・怒り・嫌悪・悲しみ・恐怖・驚き）での感情分析を実施可能です。
 
 - 言語: Python 3
 - パッケージマネージャー: uv
@@ -27,6 +29,7 @@ ids-steam
 ├── 03_analyze_emotions.py              - Step 3: 6感情分析処理（OOM防止追記保存・途中再開レジューム・nohup対応）
 ├── 04_analyze_review_correlations.py   - Step 4: Recommended/Not Recommended比較・プレイ時間別感情相関の集計
 ├── 05_analyze_genre_emotions.py        - Step 5: ゲームジャンル（genres）別の感情プロファイル集計
+├── 06_analyze_genre_playtime_correlations.py - Step 6: ジャンル別のプレイ時間vs感情相関集計
 ├── data_processor.py                   - 日本語判定・CSV/JSON処理の共有モジュール
 ├── analysis_report.md                  - 分析結果の考察・知見レポートメモ
 └── readme.md
@@ -34,16 +37,17 @@ ids-steam
 
 ## 実行方法
 
-番号順（`01_` → `02_` → `03_` → `04_` → `05_`）に従ってスクリプトを実行します。
+番号順（`01_` → `02_` → `03_` → `04_` → `05_` → `06_`）に従ってスクリプトを実行します。
 
-| ステップ | コマンド | 実行内容 |
-| --- | --- | --- |
-| **Step 1** | `uv run 01_download_data.py` | Mendeleyからデータのダウンロードおよび解凍を実行（初回のみ） |
-| **Step 2** | `uv run 02_extract_japanese_reviews.py` | 全レビューCSVから日本語レビューを抽出して `japanese_steam_reviews.csv` へ保存 |
-| **Step 3** | `uv run 03_analyze_emotions.py` | `japanese_steam_reviews.csv` の全件に対して6感情分析を実行 |
-| **Step 4** | `uv run 04_analyze_review_correlations.py` | Recommended / Not Recommended の感情比較およびプレイ時間別感情相関の定量分析 |
-| **Step 5** | `uv run 05_analyze_genre_emotions.py` | ゲームジャンル別の感情プロファイルおよび評価構成の集計分析 |
-| (テスト) | `uv run 03_analyze_emotions.py 100` | 指定件数（例: 100件）をランダム抽出して6感情分析を実行 |
+| ステップ   | コマンド                                           | 実行内容                                                                      |
+| ---------- | -------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **Step 1** | `uv run 01_download_data.py`                       | Mendeleyからデータのダウンロードおよび解凍を実行（初回のみ）                  |
+| **Step 2** | `uv run 02_extract_japanese_reviews.py`            | 全レビューCSVから日本語レビューを抽出して `japanese_steam_reviews.csv` へ保存 |
+| **Step 3** | `uv run 03_analyze_emotions.py`                    | `japanese_steam_reviews.csv` の全件に対して6感情分析を実行                    |
+| **Step 4** | `uv run 04_analyze_review_correlations.py`         | Recommended / Not Recommended の感情比較およびプレイ時間別感情相関の定量分析  |
+| **Step 5** | `uv run 05_analyze_genre_emotions.py`              | ゲームジャンル別の感情プロファイルおよび評価構成の集計分析                    |
+| **Step 6** | `uv run 06_analyze_genre_playtime_correlations.py` | 各ゲームジャンル内でのプレイ時間と感情割合の相関分析                          |
+| (テスト)   | `uv run 03_analyze_emotions.py 100`                | 指定件数（例: 100件）をランダム抽出して6感情分析を実行                        |
 
 ### VPSでの長時間バックグラウンド実行（SSH切断・OOM対策）
 
@@ -63,12 +67,12 @@ tail -f data/analyze_emotions.log
 
 ### 処理結果ファイル・分析レポート
 
-| ファイル名 | 説明 |
-| --- | --- |
-| [analysis_report.md](analysis_report.md) | 分析レポートメモ: Not Recommended の要因分析、プレイ時間相関、ジャンル別感情特性をまとめたレポート |
-| `data/japanese_steam_reviews.csv` | 高精度フィルター（※注1）により抽出された日本語レビューデータ |
-| `data/japanese_steam_reviews_emotions.csv` | 全件感情分析結果（6感情スコア・割合(%)・ランキング） |
-| `data/insights/` | Recommended 比較、プレイ時間帯別、ジャンル別感情相関の集計結果ディレクトリ |
+| ファイル名                                 | 説明                                                                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| [analysis_report.md](analysis_report.md)   | 分析レポートメモ: Not Recommended の要因分析、プレイ時間相関、ジャンル別感情特性、ジャンル内プレイ時間相関のレポート |
+| `data/japanese_steam_reviews.csv`          | 高精度フィルター（※注1）により抽出された日本語レビューデータ                                                         |
+| `data/japanese_steam_reviews_emotions.csv` | 全件感情分析結果（6感情スコア・割合(%)・ランキング）                                                                 |
+| `data/insights/`                           | Recommended 比較、プレイ時間帯別、ジャンル別感情相関の集計結果ディレクトリ                                           |
 
 ### games.jsonのデータと構造
 
@@ -92,13 +96,13 @@ tail -f data/analyze_emotions.log
 
 ## ゼミVPSのスペック
 
-| 構成要素 | 詳細スペック |
-| --- | --- |
-| CPU | Intel Xeon Processor Sapphire Rapids |
-| コア数とスレッド数 | 8コア 8スレッド、独立した8ソケット構成 |
-| CPU拡張機能 | Intel AMX 対応 |
-| アーキテクチャ | x86_64 |
-| GPU | 物理GPU無し、QEMU Standard VGA 仮想グラフィック |
-| RAM | 16GiB |
-| ROM | 800GB |
-| 仮想化環境 | QEMU KVM |
+| 構成要素           | 詳細スペック                                    |
+| ------------------ | ----------------------------------------------- |
+| CPU                | Intel Xeon Processor Sapphire Rapids            |
+| コア数とスレッド数 | 8コア 8スレッド、独立した8ソケット構成          |
+| CPU拡張機能        | Intel AMX 対応                                  |
+| アーキテクチャ     | x86_64                                          |
+| GPU                | 物理GPU無し、QEMU Standard VGA 仮想グラフィック |
+| RAM                | 16GiB                                           |
+| ROM                | 800GB                                           |
+| 仮想化環境         | QEMU KVM                                        |
