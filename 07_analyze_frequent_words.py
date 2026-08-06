@@ -1,16 +1,34 @@
-import pandas as pd
-import MeCab
-import unidic_lite
-from collections import Counter
-import re
-from tqdm import tqdm
 import os
+import re
+from collections import Counter
+
+import MeCab
+import pandas as pd
+import unidic_lite
+from tqdm import tqdm
+
 
 def is_stopword(word: str) -> bool:
     """
     ストップワードを除外する
     """
-    stopwords = {"こと", "もの", "これ", "それ", "あれ", "どれ", "よう", "ため", "ん", "の", "ほう", "ところ", "わけ", "はず", "うち"}
+    stopwords = {
+        "こと",
+        "もの",
+        "これ",
+        "それ",
+        "あれ",
+        "どれ",
+        "よう",
+        "ため",
+        "ん",
+        "の",
+        "ほう",
+        "ところ",
+        "わけ",
+        "はず",
+        "うち",
+    }
     if word in stopwords:
         return True
 
@@ -19,10 +37,8 @@ def is_stopword(word: str) -> bool:
         return True
 
     # 数値のみの単語も除外
-    if re.match(r"^[0-9０-９]+$", word):
-        return True
+    return bool(re.match(r"^[0-9０-９]+$", word))
 
-    return False
 
 def extract_nouns(text: str, tagger: MeCab.Tagger) -> list[str]:
     """
@@ -41,7 +57,7 @@ def extract_nouns(text: str, tagger: MeCab.Tagger) -> list[str]:
             node = node.next
             continue
 
-        features = node.feature.split(',')
+        features = node.feature.split(",")
         pos = features[0]
         pos_detail = features[1] if len(features) > 1 else ""
 
@@ -71,6 +87,7 @@ def extract_nouns(text: str, tagger: MeCab.Tagger) -> list[str]:
             nouns.append(compound_word)
 
     return nouns
+
 
 def main():
     print("Loading data...")
@@ -118,10 +135,11 @@ def main():
     os.makedirs("data/insights", exist_ok=True)
     df_result.to_csv(out_path, index=False)
 
-    print(f"\nTop 10 overall nouns:")
+    print("\nTop 10 overall nouns:")
     print(df_all.head(10))
 
     print(f"\nResults saved to {out_path}")
+
 
 if __name__ == "__main__":
     main()

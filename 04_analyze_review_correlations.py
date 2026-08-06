@@ -1,5 +1,5 @@
 import os
-import numpy as np
+
 import pandas as pd
 
 # 6つの主要感情
@@ -8,7 +8,9 @@ EMOTION_RATIO_COLS = [f"ratio_{e}_pct" for e in MAIN_EMOTIONS]
 EMOTION_SCORE_COLS = [f"score_{e}" for e in MAIN_EMOTIONS]
 
 
-def analyze_recommendation_comparison(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+def analyze_recommendation_comparison(
+    df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     高評価 (Recommended) vs 低評価 (Not Recommended) の感情構造の比較分析
     """
@@ -32,7 +34,10 @@ def analyze_recommendation_comparison(df: pd.DataFrame) -> tuple[pd.DataFrame, p
 
     # 1-2. 主要感情 (primary_emotion) の分布割合(%)
     primary_dist = (
-        pd.crosstab(df_clean["recommend_clean"], df_clean["primary_emotion"], normalize="index") * 100
+        pd.crosstab(
+            df_clean["recommend_clean"], df_clean["primary_emotion"], normalize="index"
+        )
+        * 100
     ).round(2)
 
     print("\n--- 2. おすすめ別 主要感情 (primary_emotion) 出現頻度(%) ---")
@@ -41,7 +46,9 @@ def analyze_recommendation_comparison(df: pd.DataFrame) -> tuple[pd.DataFrame, p
     return summary_df, primary_dist
 
 
-def analyze_playtime_correlations(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+def analyze_playtime_correlations(
+    df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     プレイ時間 (playtime) と 6感情の相関・カテゴリ別集計分析
     """
@@ -57,15 +64,16 @@ def analyze_playtime_correlations(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Da
     # 2-1. プレイ時間の相関係数 (Pearson & Spearman)
     corr_records = []
     for emotion in MAIN_EMOTIONS:
-        score_col = f"score_{emotion}"
         ratio_col = f"ratio_{emotion}_pct"
         pearson_ratio = df_play["playtime"].corr(df_play[ratio_col], method="pearson")
         spearman_ratio = df_play["playtime"].rank().corr(df_play[ratio_col].rank())
-        corr_records.append({
-            "感情": emotion,
-            "相関係数 (Pearson)": round(pearson_ratio, 4),
-            "順位相関 (Spearman)": round(spearman_ratio, 4)
-        })
+        corr_records.append(
+            {
+                "感情": emotion,
+                "相関係数 (Pearson)": round(pearson_ratio, 4),
+                "順位相関 (Spearman)": round(spearman_ratio, 4),
+            }
+        )
 
     corr_df = pd.DataFrame(corr_records).set_index("感情")
     print("\n--- 1. プレイ時間と感情割合(%)の相関係数 ---")
@@ -73,7 +81,13 @@ def analyze_playtime_correlations(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Da
 
     # 2-2. プレイ時間のバケット分け集計
     bins = [-1, 2, 10, 30, 100, float("inf")]
-    labels = ["極短時間 (0-2h)", "短時間 (2-10h)", "中時間 (10-30h)", "長時間 (30-100h)", "ヘビー (100h+)"]
+    labels = [
+        "極短時間 (0-2h)",
+        "短時間 (2-10h)",
+        "中時間 (10-30h)",
+        "長時間 (30-100h)",
+        "ヘビー (100h+)",
+    ]
     df_play["playtime_bucket"] = pd.cut(df_play["playtime"], bins=bins, labels=labels)
 
     bucket_group = df_play.groupby("playtime_bucket", observed=False)
@@ -104,13 +118,21 @@ def main():
 
     # 分析1: おすすめ比較
     rec_summary, primary_dist = analyze_recommendation_comparison(df)
-    rec_summary.to_csv(os.path.join(output_dir, "recommend_ratio_summary.csv"), encoding="utf-8-sig")
-    primary_dist.to_csv(os.path.join(output_dir, "recommend_primary_dist.csv"), encoding="utf-8-sig")
+    rec_summary.to_csv(
+        os.path.join(output_dir, "recommend_ratio_summary.csv"), encoding="utf-8-sig"
+    )
+    primary_dist.to_csv(
+        os.path.join(output_dir, "recommend_primary_dist.csv"), encoding="utf-8-sig"
+    )
 
     # 分析2: プレイ時間相関
     corr_df, bucket_summary = analyze_playtime_correlations(df)
-    corr_df.to_csv(os.path.join(output_dir, "playtime_correlations.csv"), encoding="utf-8-sig")
-    bucket_summary.to_csv(os.path.join(output_dir, "playtime_bucket_summary.csv"), encoding="utf-8-sig")
+    corr_df.to_csv(
+        os.path.join(output_dir, "playtime_correlations.csv"), encoding="utf-8-sig"
+    )
+    bucket_summary.to_csv(
+        os.path.join(output_dir, "playtime_bucket_summary.csv"), encoding="utf-8-sig"
+    )
 
     print("\n" + "=" * 80)
     print(f"分析完了！集計テーブルを '{output_dir}' ディレクトリへ出力しました。")

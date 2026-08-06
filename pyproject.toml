@@ -9,3 +9,16 @@ dependencies = [
     "transformers>=5.14.1",
     "unidic-lite>=1.0.8",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.1",
+]
+
+[tool.ruff.lint]
+ignore = [
+    "BLE001", # Do not catch blind exception
+    "S110",   # try-except-pass
+    "SIM102", # nested if
+]
+

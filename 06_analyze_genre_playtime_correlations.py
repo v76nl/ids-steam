@@ -1,6 +1,7 @@
 import ast
 import os
 import re
+
 import pandas as pd
 
 MAIN_EMOTIONS = ["喜び", "悲しみ", "怒り", "恐怖", "驚き", "嫌悪"]
@@ -51,7 +52,7 @@ def analyze_genre_playtime_correlations(df: pd.DataFrame) -> pd.DataFrame:
             "ジャンル": genre,
             "件数": count,
             "平均時間(h)": avg_playtime,
-            "中央値時間(h)": median_playtime
+            "中央値時間(h)": median_playtime,
         }
 
         # 6感情それぞれの順位相関 (Spearman)
@@ -84,10 +85,15 @@ def main():
     print(f"読込完了: 全 {len(df):,} 件")
 
     corr_df = analyze_genre_playtime_correlations(df)
-    corr_df.to_csv(os.path.join(output_dir, "genre_playtime_correlations.csv"), encoding="utf-8-sig")
+    corr_df.to_csv(
+        os.path.join(output_dir, "genre_playtime_correlations.csv"),
+        encoding="utf-8-sig",
+    )
 
     print("\n" + "=" * 80)
-    print(f"ジャンル別プレイ時間相関分析完了！結果を '{output_dir}/genre_playtime_correlations.csv' へ出力しました。")
+    print(
+        f"ジャンル別プレイ時間相関分析完了！結果を '{output_dir}/genre_playtime_correlations.csv' へ出力しました。"
+    )
     print("=" * 80)
 
 
